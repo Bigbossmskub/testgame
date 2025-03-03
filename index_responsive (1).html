@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geo Quiz Adventure</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f0f8ff;
+        }
+        #container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+        }
+        .game-container {
+            display: flex;
+            flex-grow: 1;
+        }
+        #map {
+            width: 70%;
+            height: 100%;
+        }
+        .sidebar {
+            width: 30%;
+            background-color: #ecf0f1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .quiz-container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .option {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: left;
+            transition: background-color 0.3s;
+        }
+        .option:hover {
+            background-color: #2980b9;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stat {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .locked-country {
+            fill: #bdc3c7;
+            stroke: #7f8c8d;
+            stroke-width: 1;
+            cursor: not-allowed;
+        }
+        .unlocked-country {
+            fill: #27ae60;
+            stroke: #2c3e50;
+            stroke-width: 1;
+            cursor: pointer;
+            transition: fill 0.3s;
+        }
+        .unlocked-country:hover {
+            fill: #2ecc71;
+        }
+        .current-country {
+            fill: #f1c40f;
+            stroke: #2c3e50;
+            stroke-width: 2;
+            cursor: pointer;
+        }
+        .timer {
+            font-size: 18px;
+            font-weight: bold;
+            color: #e74c3c;
+            margin-bottom: 10px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            max-width: 500px;
+        }
+        .progress-container {
+            margin-top: 10px;
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .progress-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .progress-bar {
+            height: 20px;
+            background-color: #ecf0f1;
+            border-radius: 10px;
+            margin-bottom: 5px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #3498db;
+            width: 0%;
+            transition: width 0.5s;
+        }
+        .progress-text {
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+        .completed {
+            background-color: #2ecc71;
+        }
+    
+@media (max-width: 1024px) {
+    .game-container {
+        flex-direction: column;
+    }
+    #map {
+        width: 100%;
+        height: 50vh; /* ปรับขนาดแผนที่ให้เหมาะกับหน้าจอเล็ก */
+    }
+    .sidebar {
+        width: 100%;
+        height: auto;
+        padding: 10px;
+    }
+}
+
+@media (max-width: 768px) {
+    .quiz-container {
+        padding: 10px;
+    }
+    .option {
+        font-size: 14px;
+        padding: 8px;
+    }
+    .stat-value {
+        font-size: 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    header h1 {
+        font-size: 18px;
+    }
+    .stat-value {
+        font-size: 16px;
+    }
+    .quiz-container h2 {
+        font-size: 16px;
+    }
+    .option {
+        font-size: 12px;
+        padding: 6px;
+    }
+}
+
+</style>
+</head>
+<body>
+    <div id="container">
+        <header>
+            <h1>Geo Quiz Adventure</h1>
+        </header>
+        <div class="game-container">
+            <div id="map"></div>
+            <div class="sidebar">
+                <div class="stats">
+                    <div class="stat">
+                        <div class="stat-value" id="score">0</div>
+                        <div>คะแนน</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="level">1</div>
+                        <div>ด่าน</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="unlocked">0/10</div>
+                        <div>ปลดล็อก</div>
+                    </div>
+                </div>
+                <div class="timer" id="timer">เวลา: 30 วินาที</div>
+                <div class="progress-container">
+                    <div class="progress-title">ความคืบหน้าด่านปัจจุบัน</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <div class="progress-text" id="progress-text">0/0 คำถาม</div>
+                </div>
+                <div class="quiz-container">
+                    <h2 id="question">กำลังโหลดคำถาม...</h2>
+                    <div id="options">
+                        <!-- Options will be generated dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="resultModal">
+        <div class="modal-content">
+            <h2 id="resultTitle">ถูกต้อง!</h2>
+            <p id="resultMessage">คุณได้ปลดล็อกประเทศใหม่!</p>
+            <button class="option" onclick="closeModal()">ดำเนินการต่อ</button>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
+    <script>
+        // Game state
+        const gameState = {
+            score: 0,
+            level: 1,
+            unlocked: 0,
+            totalCountries: 10,
+            currentCountry: null,
+            timer: 30,
+            timerInterval: null,
+            unlockedCountries: [],
+            // เพิ่มการติดตามคำถามที่ตอบแล้วในแต่ละประเทศ
+            answeredQuestions: {},
+            // เพิ่มการติดตามคำถามปัจจุบัน
+            currentQuestionIndex: 0,
+            quizData: [
+                {
+                    country: "Thailand",
+                    coordinates: [13.7563, 100.5018],
+                    questions: [
+                        {
+                            question: "เมืองหลวงของประเทศไทยคืออะไร?",
+                            options: ["กรุงเทพมหานคร", "เชียงใหม่", "ภูเก็ต", "หาดใหญ่"],
+                            answer: 0
+                        },
+                        {
+                            question: "แม่น้ำสายสำคัญที่สุดของประเทศไทยคืออะไร?",
+                            options: ["แม่น้ำปิง", "แม่น้ำวัง", "แม่น้ำยม", "แม่น้ำเจ้าพระยา"],
+                            answer: 3
+                        }
+                    ]
+                },
+                {
+                    country: "Japan",
+                    coordinates: [35.6762, 139.6503],
+                    questions: [
+                        {
+                            question: "เมืองหลวงของประเทศญี่ปุ่นคืออะไร?",
+                            options: ["โตเกียว", "โอซาก้า", "เกียวโต", "ฮิโรชิม่า"],
+                            answer: 0
+                        },
+                        {
+                            question: "ภูเขาที่สูงที่สุดในประเทศญี่ปุ่นคืออะไร?",
+                            options: ["ภูเขาฟูจิ", "ภูเขาทาเทยาม่า", "ภูเขาอาซาฮี", "ภูเขาโยเทอิ"],
+                            answer: 0
+                        }
+                    ]
+                },
+                {
+                    country: "China",
+                    coordinates: [39.9042, 116.4074],
+                    questions: [
+                        {
+                            question: "เมืองหลวงของประเทศจีนคืออะไร?",
+                            options: ["ปักกิ่ง", "เซี่ยงไฮ้", "กวางโจว", "ฮ่องกง"],
+                            answer: 0
+                        },
+                        {
+                            question: "แม่น้ำสายสำคัญที่สุดของประเทศจีนคืออะไร?",
+                            options: ["แม่น้ำฮวงโห", "แม่น้ำแยงซี", "แม่น้ำเพิร์ล", "แม่น้ำเหลือง"],
+                            answer: 1
+                        }
+                    ]
+                },
+                {
+                    country: "Vietnam",
+                    coordinates: [21.0285, 105.8542],
+                    questions: [
+                        {
+                            question: "เมืองหลวงของประเทศเวียดนามคืออะไร?",
+                            options: ["ฮานอย", "โฮจิมินห์", "ดานัง", "เว้"],
+                            answer: 0
+                        },
+                        {
+                            question: "ชื่อเดิมของเมืองโฮจิมินห์คืออะไร?",
+                            options: ["ไซ่ง่อน", "ฮานอย", "ฮเว", "หวุงเต่า"],
+                            answer: 0
+                        }
+                    ]
+                },
+                {
+                    country: "South Korea",
+                    coordinates: [37.5665, 126.9780],
+                    questions: [
+                        {
+                            question: "เมืองหลวงของประเทศเกาหลีใต้คืออะไร?",
+                            options: ["โซล", "ปูซาน", "อินชอน", "เดกู"],
+                            answer: 0
+                        },
+                        {
+                            question: "อะไรเป็นหนึ่งในอุตสาหกรรมที่สำคัญที่สุดของประเทศเกาหลีใต้?",
+                            options: ["อุตสาหกรรมยานยนต์", "อุตสาหกรรมอิเล็กทรอนิกส์", "อุตสาหกรรมแฟชั่น", "ทั้งหมดที่กล่าวมา"],
+                            answer: 3
+                        }
+                    ]
+                },
+                {
+                    country: "Malaysia",
+                    coordinates: [3.1390, 101.6869],
+                    questions: [
+                        {
+                            question: "เมืองหลวงของประเทศมาเลเซียคืออะไร?",
+                            options: ["กัวลาลัมเปอร์", "ปีนัง", "โยฮอร์บาห์รู", "ปุตราจายา"],
+                            answer: 3
+                        },
+                        {
+                            question: "ประเทศมาเลเซียตั้งอยู่ในทวีปอะไร?",
+                            options: ["เอเชีย", "แอฟริกา", "ยุโรป", "อเมริกาใต้"],
+                            answer: 0
+                        }
+                    ]
+                },
+                {
+                    country: "Singapore",
+                    coordinates: [1.3521, 103.8198],
+                    questions: [
+                        {
+                            question: "สิงคโปร์เป็นประเทศหรือเมือง?",
+                            options: ["ประเทศ", "เมือง", "รัฐ", "เกาะ"],
+                            answer: 0
+                        },
+                        {
+                            question: "ภาษาราชการของสิงคโปร์มีกี่ภาษา?",
+                            options: ["1", "2", "3", "4"],
+                            answer: 3
+                        }
+                    ]
+                },
+                {
+                    country: "Indonesia",
+                    coordinates: [-6.1751, 106.8650],
+                    questions: [
+                        {
+                            question: "เมืองหลวงของประเทศอินโดนีเซียคืออะไร?",
+                            options: ["จาการ์ตา", "บาหลี", "สุราบายา", "บันดุง"],
+                            answer: 0
+                        },
+                        {
+                            question: "ประเทศอินโดนีเซียประกอบด้วยเกาะกี่เกาะ?",
+                            options: ["ประมาณ 1,000 เกาะ", "ประมาณ 6,000 เกาะ", "ประมาณ 13,000 เกาะ", "ประมาณ 17,000 เกาะ"],
+                            answer: 3
+                        }
+                    ]
+                },
+                {
+                    country: "India",
+                    coordinates: [28.6139, 77.2090],
+                    questions: [
+                        {
+                            question: "เมืองหลวงของประเทศอินเดียคืออะไร?",
+                            options: ["นิวเดลี", "มุมไบ", "กัลกัตตา", "ชัยปุระ"],
+                            answer: 0
+                        },
+                        {
+                            question: "แม่น้ำศักดิ์สิทธิ์ของประเทศอินเดียคืออะไร?",
+                            options: ["แม่น้ำคงคา", "แม่น้ำพรหมบุตร", "แม่น้ำยมุนา", "แม่น้ำโกดาวารี"],
+                            answer: 0
+                        }
+                    ]
+                },
+                {
+                    country: "Australia",
+                    coordinates: [-35.2809, 149.1300],
+                    questions: [
+                        {
+                            question: "เมืองหลวงของประเทศออสเตรเลียคืออะไร?",
+                            options: ["แคนเบอร์รา", "ซิดนีย์", "เมลเบิร์น", "บริสเบน"],
+                            answer: 0
+                        },
+                        {
+                            question: "ประเทศออสเตรเลียตั้งอยู่ในซีกโลกใด?",
+                            options: ["ซีกโลกเหนือ", "ซีกโลกใต้", "ทั้งซีกโลกเหนือและใต้", "ไม่มีข้อใดถูก"],
+                            answer: 1
+                        }
+                    ]
+                }
+            ]
+        };
+
+        // Initialize map
+        const map = L.map('map').setView([20, 100], 3);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        
+window.addEventListener('resize', function() {
+    setTimeout(() => {
+        map.invalidateSize();
+    }, 300);
+});
+
+// Initialize game
+        function initGame() {
+            // สร้างโครงสร้างข้อมูลสำหรับติดตามคำถามที่ตอบแล้วในแต่ละประเทศ
+            gameState.quizData.forEach(country => {
+                gameState.answeredQuestions[country.country] = new Array(country.questions.length).fill(false);
+            });
+            
+            // ปลดล็อกประเทศแรก (Thailand)
+            gameState.unlockedCountries.push("Thailand");
+            gameState.currentCountry = "Thailand";
+            updateStats();
+            
+            // เพิ่มมาร์กเกอร์สำหรับทุกประเทศ
+            gameState.quizData.forEach(country => {
+                const isUnlocked = gameState.unlockedCountries.includes(country.country);
+                const isCurrent = country.country === gameState.currentCountry;
+                
+                const markerOptions = {
+                    title: country.country,
+                    riseOnHover: true
+                };
+                
+                if (isUnlocked || isCurrent) {
+                    const marker = L.marker(country.coordinates, markerOptions)
+                        .addTo(map)
+                        .bindPopup(`<b>${country.country}</b>${isCurrent ? ' (ปัจจุบัน)' : ' (ปลดล็อกแล้ว)'}`)
+                        .on('click', () => {
+                            if (isUnlocked) {
+                                selectCountry(country.country);
+                            }
+                        });
+                    
+                    if (isCurrent) {
+                        marker.openPopup();
+                        map.setView(country.coordinates, 5);
+                    }
+                } else {
+                    L.marker(country.coordinates, { 
+                        ...markerOptions,
+                        opacity: 0.5
+                    })
+                    .addTo(map)
+                    .bindPopup(`<b>${country.country}</b> (ยังไม่ปลดล็อก)`);
+                }
+            });
+            
+            loadQuestion();
+            updateProgressBar();
+        }
+
+        // เลือกประเทศและโหลดคำถาม
+        function selectCountry(countryName) {
+            gameState.currentCountry = countryName;
+            gameState.currentQuestionIndex = 0;
+            const country = gameState.quizData.find(c => c.country === countryName);
+            map.setView(country.coordinates, 5);
+            
+            // หาคำถามที่ยังไม่ได้ตอบ
+            const unansweredIndex = gameState.answeredQuestions[countryName].findIndex(answered => !answered);
+            if (unansweredIndex !== -1) {
+                gameState.currentQuestionIndex = unansweredIndex;
+            }
+            
+            loadQuestion();
+            updateProgressBar();
+        }
+
+        // โหลดคำถามสำหรับประเทศปัจจุบัน
+        function loadQuestion() {
+            clearInterval(gameState.timerInterval);
+            gameState.timer = 30;
+            updateTimer();
+            
+            const country = gameState.quizData.find(c => c.country === gameState.currentCountry);
+            
+            // ตรวจสอบว่ามีคำถามที่ยังไม่ได้ตอบหรือไม่
+            const allAnswered = gameState.answeredQuestions[gameState.currentCountry].every(answered => answered);
+            
+            if (allAnswered) {
+                document.getElementById('question').textContent = `คุณได้ตอบคำถามทั้งหมดสำหรับ ${gameState.currentCountry} แล้ว!`;
+                document.getElementById('options').innerHTML = '<button class="option" onclick="selectNextUncompletedCountry()">ไปยังประเทศถัดไป</button>';
+                return;
+            }
+            
+            const currentQuestion = country.questions[gameState.currentQuestionIndex];
+            
+            document.getElementById('question').textContent = currentQuestion.question;
+            
+            const optionsContainer = document.getElementById('options');
+            optionsContainer.innerHTML = '';
+            
+            currentQuestion.options.forEach((option, index) => {
+                const button = document.createElement('button');
+                button.className = 'option';
+                button.textContent = option;
+                button.onclick = () => checkAnswer(index, currentQuestion.answer);
+                optionsContainer.appendChild(button);
+            });
+            
+            startTimer();
+        }
+
+        // ตรวจสอบคำตอบ
+        function checkAnswer(selectedIndex, correctIndex) {
+            clearInterval(gameState.timerInterval);
+            
+            const country = gameState.quizData.find(c => c.country === gameState.currentCountry);
+            
+            if (selectedIndex === correctIndex) {
+                gameState.score += 100 + gameState.timer * 5;
+                
+                // บันทึกว่าคำถามนี้ถูกตอบแล้ว
+                gameState.answeredQuestions[gameState.currentCountry][gameState.currentQuestionIndex] = true;
+                
+                // ตรวจสอบว่าตอบคำถามครบทุกข้อหรือยัง
+                const allAnswered = gameState.answeredQuestions[gameState.currentCountry].every(answered => answered);
+                
+                if (allAnswered) {
+                    // เพิ่มระดับและปลดล็อกประเทศถัดไป (ถ้ามี)
+                    gameState.level++;
+                    
+                    if (gameState.unlocked < gameState.totalCountries - 1) {
+                        unlockNextCountry();
+                    }
+                    
+                    updateStats();
+                    updateProgressBar();
+                    
+                    showModal(true, 'ยินดีด้วย!', `คุณได้ตอบคำถามครบทุกข้อสำหรับ ${gameState.currentCountry}!`);
+                } else {
+                    // ไปยังคำถามถัดไปที่ยังไม่ได้ตอบ
+                    const nextUnansweredIndex = gameState.answeredQuestions[gameState.currentCountry].findIndex((answered, index) => !answered && index > gameState.currentQuestionIndex);
+                    
+                    if (nextUnansweredIndex !== -1) {
+                        gameState.currentQuestionIndex = nextUnansweredIndex;
+                    } else {
+                        // ไม่พบคำถามถัดไปที่ยังไม่ได้ตอบ ให้เริ่มตั้งแต่ต้น
+                        const firstUnansweredIndex = gameState.answeredQuestions[gameState.currentCountry].findIndex(answered => !answered);
+                        gameState.currentQuestionIndex = firstUnansweredIndex !== -1 ? firstUnansweredIndex : 0;
+                    }
+                    
+                    updateStats();
+                    updateProgressBar();
+                    
+                    showModal(true, 'ถูกต้อง!', `คุณได้รับ ${100 + gameState.timer * 5} คะแนน!`);
+                }
+            } else {
+                gameState.score = Math.max(0, gameState.score - 50);
+                updateStats();
+                showModal(false, 'ไม่ถูกต้อง!', 'ลองอีกครั้ง คุณเสีย 50 คะแนน');
+            }
+        }
+
+        // ปลดล็อกประเทศถัดไป
+        function unlockNextCountry() {
+            gameState.unlocked++;
+            
+            if (gameState.unlocked < gameState.totalCountries) {
+                const nextCountry = gameState.quizData[gameState.unlocked].country;
+                gameState.unlockedCountries.push(nextCountry);
+                
+                // เพิ่มมาร์กเกอร์สำหรับประเทศที่ปลดล็อกใหม่
+                const country = gameState.quizData.find(c => c.country === nextCountry);
+                const marker = L.marker(country.coordinates, {
+                    title: country.country,
+                    riseOnHover: true
+                })
+                .addTo(map)
+                .bindPopup(`<b>${country.country}</b> (ปลดล็อกใหม่!)`)
+                .on('click', () => {
+                    selectCountry(country.country);
+                });
+                
+                marker.openPopup();
+                
+                showModal(true, 'ยินดีด้วย!', `คุณได้ปลดล็อกประเทศ ${nextCountry}!`);
+            } else {
+                showModal(true, 'ชัยชนะ!', 'คุณได้ปลดล็อกทุกประเทศแล้ว! ยินดีด้วย!');
+            }
+        }
+
+        // เลือกประเทศถัดไปที่ยังไม่เคลียร์
+        function selectNextUncompletedCountry() {
+            let foundIncomplete = false;
+            
+            // ตรวจสอบประเทศที่ปลดล็อกแล้วทั้งหมด
+            for (const countryName of gameState.unlockedCountries) {
+                // ข้ามประเทศปัจจุบัน
+                if (countryName === gameState.currentCountry) continue;
+                
+                // ตรวจสอบว่ามีคำถามที่ยังไม่ได้ตอบหรือไม่
+                const hasUnanswered = gameState.answeredQuestions[countryName].some(answered => !answered);
+                
+                if (hasUnanswered) {
+                    selectCountry(countryName);
+                    foundIncomplete = true;
+                    break;
+                }
+            }
+            
+            if (!foundIncomplete) {
+                showModal(true, 'ยินดีด้วย!', 'คุณได้ตอบคำถามครบทุกข้อในทุกประเทศที่ปลดล็อกแล้ว!');
+            }
+        }
+
+        // เริ่มตัวจับเวลา
+        function startTimer() {
+            gameState.timerInterval = setInterval(() => {
+                gameState.timer--;
+                updateTimer();
+                
+                if (gameState.timer <= 0) {
+                    clearInterval(gameState.timerInterval);
+                    gameState.score = Math.max(0, gameState.score - 25);
+                    updateStats();
+                    showModal(false, 'หมดเวลา!', 'คุณเสีย 25 คะแนน');
+                }
+            }, 1000);
+        }
+
+        // อัปเดตแสดงเวลา
+        function updateTimer() {
+            document.getElementById('timer').textContent = `เวลา: ${gameState.timer} วินาที`;
+            if (gameState.timer <= 10) {
+                document.getElementById('timer').style.color = '#e74c3c';
+            } else {
+                document.getElementById('timer').style.color = '#2c3e50';
+            }
+        }
+
+        // อัปเดตแสดงสถิติ
+        function updateStats() {
+            document.getElementById('score').textContent = gameState.score;
+            document.getElementById('level').textContent = gameState.level;
+            document.getElementById('unlocked').textContent = `${gameState.unlocked}/${gameState.totalCountries}`;
+        }
+
+        // อัปเดตแถบความคืบหน้า
+        function updateProgressBar() {
+            const country = gameState.quizData.find(c => c.country === gameState.currentCountry);
+            if (!country) return;
+            
+            const totalQuestions = country.questions.length;
+            const answeredQuestions = gameState.answeredQuestions[gameState.currentCountry].filter(answered => answered).length;
+            
+            const progressPercent = totalQuestions > 0 ? (answeredQuestions / totalQuestions) * 100 : 0;
+            
+            document.getElementById('progress-fill').style.width = `${progressPercent}%`;
+            document.getElementById('progress-text').textContent = `${answeredQuestions}/${totalQuestions} คำถาม`;
+            
+            if (progressPercent === 100) {
+                document.getElementById('progress-fill').classList.add('completed');
+            } else {
+                document.getElementById('progress-fill').classList.remove('completed');
+            }
+        }
+
+        // แสดงข้อความผลลัพธ์
+        function showModal(isSuccess, title, message) {
+            document.getElementById('resultTitle').textContent = title;
+            document.getElementById('resultMessage').textContent = message;
+            
+            const modal = document.getElementById('resultModal');
+            modal.style.display = 'flex';
+            
+            if (isSuccess) {
+                document.getElementById('resultTitle').style.color = '#27ae60';
+            } else {
+                document.getElementById('resultTitle').style.color = '#e74c3c';
+            }
+        }
+
+        // ปิดข้อความผลลัพธ์
+        function closeModal() {
+            document.getElementById('resultModal').style.display = 'none';
+            loadQuestion();
+        }
+
+        // เริ่มเกม
+        window.onload = initGame;
+    </script>
+</body>
+</html>
